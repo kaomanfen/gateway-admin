@@ -1,51 +1,29 @@
+FROM php:7.2-cli-alpine as build_composer
+
+WORKDIR /var/www/html
+
+COPY . .
+
+RUN wget https://dl.laravel-china.org/composer.phar -O /usr/local/bin/composer ; chmod a+x /usr/local/bin/composer
+
+RUN apk add --no-cache git
+RUN composer install --no-dev
+
 FROM php:7.2-fpm-alpine
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-RUN apk add --no-cache --virtual .build-deps \
-        $PHPIZE_DEPS \
-        curl-dev \
-        imagemagick-dev \
-        libtool \
-        libxml2-dev \
-        postgresql-dev \
-        sqlite-dev \
-    && apk add --no-cache \
-        openssh-client \
-        curl \
-        git \
-        imagemagick \
-        mysql-client \
-        postgresql-libs \
-    && pecl install imagick \
-    && docker-php-ext-enable imagick \
-    && docker-php-ext-install \
-        curl \
-        iconv \
-        mbstring \
-        pdo \
-        pdo_mysql \
-        pdo_pgsql \
-        pdo_sqlite \
-        pcntl \
-        tokenizer \
-        xml \
-        zip \
-    && apk del -f .build-deps
+WORKDIR /var/www/html
 
-RUN wget -O /usr/bin/composer https://dl.laravel-china.org/composer.phar 
+COPY . .
 
-RUN chmod a+x /usr/bin/composer
+COPY .env.example .env
+COPY --from=build_composer  /var/www/html/vendor ./vendor
 
-# 修改 composer 为国内镜像
-RUN composer config -g repo.packagist composer https://packagist.laravel-china.org
+# RUN ls -al
 
-WORKDIR /srv/app/admin-api
-
-ADD . .
-
-RUN composer install && php artisan key:generate && php artisan jwt:secret
-
-RUN chmod -Rf 777 ./storage
-
-RUN rm -Rf /root/.ssh && rm -Rf ./ssh
+RUN php artisan config:cache
+RUN php artisan route:cache
+RUN php artisan optimize --force
+RUN docker-php-ext-install   pdo_mysql mysqli
+ADD build/docker-php-entrypoint /usr/local/bin/
+# RUN chmod 777 /usr/local/bin/docker-php-entrypoint

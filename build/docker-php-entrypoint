@@ -1,0 +1,15 @@
+#!/bin/sh
+
+echo "start..."
+
+/usr/local/bin/php /var/www/html/artisan config:cache
+chmod -R 777 /var/www/html/storage
+chmod -R 777 /var/www/html/bootstrap
+set -e
+
+# first arg is `-f` or `--some-option`
+if [ "${1#-}" != "$1" ]; then
+	set -- php-fpm "$@"
+fi
+
+exec "$@"
